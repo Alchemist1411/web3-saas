@@ -5,6 +5,7 @@ const app = express();
 
 app.use("/v1/user", userRouter);
 app.use("/v1/useworker", workerRouter);
+app.use(express.json());
 
 export const JWT_SECRET = "mysecretkey";
 

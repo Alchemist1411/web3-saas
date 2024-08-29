@@ -1,14 +1,55 @@
 import { PrismaClient } from "@prisma/client";
-import { Router } from "express";
+import { response, Router } from "express";
 import jwt from "jsonwebtoken";
 import { S3Client } from "@aws-sdk/client-s3";
 import { JWT_SECRET } from "..";
 import { authMiddleware } from "../middleware";
 import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { createTaskInput } from "../types";
 
 const prismaClient = new PrismaClient();
 const router = Router();
 const s3Client = new S3Client();
+const DEFAULT_TITLE = "Select the best one";
+
+
+router.post("/task", authMiddleware, async (req, res) => {
+    // @ts-ignore
+    const userId = req.userId;
+    const body = req.body;
+    const parsedData = createTaskInput.safeParse(body);
+    if (!parsedData.success) {
+        return res.status(411).json({
+            error: "Invalid input"
+        });
+    }
+
+    let response = await prismaClient.$transaction(async tx => {
+        const response = await tx.task.create({
+            data: {
+                title: parsedData.data.title ?? DEFAULT_TITLE,
+                amount: "1",
+                signature: parsedData.data.signature,
+                user_id: userId,
+            }
+        });
+
+        await tx.option.createMany({
+            data: parsedData.data.Options.map(x => ({
+                image_url: x.imageUrl,
+                task_id: response.id,
+            }))
+        })
+
+        return response;
+    });
+
+    res.json({
+        id: response.id,
+        "success": "Task created successfully"
+    });
+});
+
 
 router.get("/presignedUrl", authMiddleware, async (req, res) => {
     // @ts-ignore
