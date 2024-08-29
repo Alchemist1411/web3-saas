@@ -14,13 +14,19 @@ router.get("/presignedUrl", authMiddleware, async (req, res) => {
     // @ts-ignore
     const userId = req.userId;
 
-    const s3Client = new S3Client({});
+    const s3Client = new S3Client({
+        credentials: {
+            accessKeyId: "somekey",
+            secretAccessKey: "somekey",
+        },
+    });
     const command = new PutObjectCommand({
         Bucket: "my-bucket",
-        Key: "my-key",
+        Key: `/fiver/${userId}/${Math.random()}/image.jpg`,
+        ContentType: "image/jpeg",
     });
     const presignedUrl = await getSignedUrl(s3Client, command, {
-        expiresIn: 3600
+        expiresIn: 3600,
     });
 });
 
