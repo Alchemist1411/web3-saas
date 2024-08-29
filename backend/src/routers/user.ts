@@ -1,32 +1,34 @@
 import { PrismaClient } from "@prisma/client";
 import { Router } from "express";
 import jwt from "jsonwebtoken";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { S3Client } from "@aws-sdk/client-s3";
 import { JWT_SECRET } from "..";
 import { authMiddleware } from "../middleware";
-
+import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
 
 const prismaClient = new PrismaClient();
 const router = Router();
+const s3Client = new S3Client();
 
 router.get("/presignedUrl", authMiddleware, async (req, res) => {
     // @ts-ignore
     const userId = req.userId;
 
-    const s3Client = new S3Client({
-        credentials: {
-            accessKeyId: "somekey",
-            secretAccessKey: "somekey",
-        },
-    });
-    const command = new PutObjectCommand({
+    const { url, fields } = await createPresignedPost(s3Client, {
         Bucket: "my-bucket",
-        Key: `/fiver/${userId}/${Math.random()}/image.jpg`,
-        ContentType: "image/jpeg",
+        Key: `fiver/${userId}/${Math.random()}/image.jpg`,
+        Conditions: [
+            ["content-length-range", 0, 5 * 1024 * 1024],
+        ],
+        Fields: {
+            "Content-Type": "image/jpeg",
+        },
+        Expires: 3600,
     });
-    const presignedUrl = await getSignedUrl(s3Client, command, {
-        expiresIn: 3600,
+
+    res.json({
+        presignedUrl: url,
+        fields: fields
     });
 });
 
